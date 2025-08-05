@@ -1,120 +1,104 @@
-# 🔥 FireAlert Mobile App - AI Rules & Tech Stack
+## Additional Development Guidelines
 
-## Tech Stack Overview
+### Component Architecture Rules
+- **Single Responsibility Principle**: Each component must have one clear purpose
+- **Maximum 200 lines per component**: Refactor immediately if exceeded
+- **Props Interface Definition**: Always define TypeScript interfaces for component props
+- **Default Props**: Use default parameters instead of defaultProps for functional components
+- **Memoization**: Use React.memo() for components that receive stable props
 
-- **React Native 0.79.5** - Cross-platform mobile framework for iOS/Android
-- **TypeScript 5.8.3** - Type-safe JavaScript for better development experience
-- **Redux Toolkit** - State management for complex app state
-- **React Navigation** - Navigation between screens and tabs
-- **Expo SDK 53** - Development platform with pre-built native modules
-- **NASA FIRMS API** - Real-time satellite fire detection data
-- **Supabase** - Backend-as-a-service for auth, database, and real-time features
-- **Socket.io** - Real-time bidirectional communication for live updates
+### State Management Best Practices
+- **Local vs Global State**: Use local state for UI-only data, Redux for app-wide state
+- **Async State**: Use createAsyncThunk for all async operations
+- **Loading States**: Always implement proper loading, error, and empty states
+- **Optimistic Updates**: Use optimistic updates for better UX, with rollback on error
+- **State Normalization**: Normalize complex state structures using createEntityAdapter
 
-## Library Usage Rules
+### API Integration Rules
+- **Service Layer**: All API calls must go through services in `src/services/`
+- **Error Boundaries**: Wrap all API calls with proper error handling
+- **Retry Logic**: Implement exponential backoff for failed requests
+- **Caching Strategy**: Use RTK Query or custom caching for frequently accessed data
+- **Offline Support**: Implement offline queue for critical operations
 
-### Navigation & Routing
-- **@react-navigation/native** - Primary navigation library
-- **@react-navigation/bottom-tabs** - Bottom tab navigation for main screens
-- **@react-navigation/native-stack** - Stack navigation for screen transitions
-- **@react-navigation/stack** - Additional stack navigation options
+### Security Implementation
+- **Input Validation**: Validate all user inputs on both client and server
+- **XSS Prevention**: Never use dangerouslySetInnerHTML
+- **CSRF Protection**: Include CSRF tokens for state-changing operations
+- **Rate Limiting**: Implement client-side rate limiting for API calls
+- **Sensitive Data**: Never log sensitive information
 
-### State Management
-- **@reduxjs/toolkit** - ONLY state management library allowed
-- **react-redux** - React bindings for Redux
-- Store structure: `src/store/slices/` for feature-specific slices
-- NEVER use Context API for global state
+### Performance Optimization
+- **Image Optimization**: Use expo-image with proper sizing and caching
+- **Bundle Splitting**: Implement code splitting for large features
+- **Memory Management**: Clean up subscriptions and timers in useEffect
+- **List Performance**: Use FlatList with proper keyExtractor and getItemLayout
+- **Animation Performance**: Use nativeDriver for all animations
 
-### UI & Styling
-- **react-native-paper** - Material Design components
-- **react-native-vector-icons** - Icon library
-- **expo-linear-gradient** - Gradient backgrounds
-- **StyleSheet.create()** - For component-specific styles
-- NO external UI libraries beyond these approved ones
+### Testing Strategy
+- **Unit Tests**: Write tests for all utility functions and hooks
+- **Component Tests**: Use React Native Testing Library for component tests
+- **Integration Tests**: Test complete user flows with Detox
+- **Snapshot Tests**: Use sparingly, only for critical UI components
+- **Coverage**: Maintain minimum 80% test coverage
 
-### Data Fetching
-- **axios** - HTTP client for API calls
-- **@supabase/supabase-js** - Supabase client (when added)
-- **socket.io-client** - Real-time data updates
-- NASA FIRMS API endpoints in `src/services/nasaApi.ts`
+### Accessibility Requirements
+- **Screen Reader Support**: All interactive elements must have accessibility labels
+- **Color Contrast**: Maintain WCAG 2.1 AA compliance for all colors
+- **Touch Targets**: Minimum 44x44px touch targets for all interactive elements
+- **Keyboard Navigation**: Support keyboard navigation on all screens
+- **Dynamic Type**: Support iOS Dynamic Type for text sizing
 
-### Device Features
-- **expo-location** - GPS and location services
-- **expo-camera** - Camera access for fire reporting
-- **expo-image-picker** - Photo selection from gallery
-- **expo-notifications** - Push notifications
-- **expo-secure-store** - Secure storage for tokens
-- **expo-av** - Audio/video playback
+### Internationalization (i18n)
+- **Default Language**: Turkish (tr-TR) as primary, English (en-US) as fallback
+- **Translation Keys**: Use meaningful keys, not English strings
+- **Pluralization**: Handle plural forms correctly using i18next
+- **RTL Support**: Prepare for potential RTL language support
+- **Date/Time**: Use locale-aware formatting with date-fns
 
-### Form Handling
-- **react-hook-form** - Form validation and handling
-- Native TextInput for basic inputs
-- react-native-paper components for styled forms
+### Monitoring & Analytics
+- **Error Tracking**: Implement Sentry for error monitoring
+- **Performance Monitoring**: Track app startup time and screen transitions
+- **User Analytics**: Use privacy-focused analytics (no personal data)
+- **Crash Reporting**: Automatic crash reporting with user consent
+- **Feature Flags**: Use feature flags for gradual rollouts
 
-### Maps & Location
-- **react-native-maps** - Map integration
-- OpenStreetMap tiles (free tier)
-- Custom markers for fire reports
+### Code Review Checklist
+- [ ] No console.log statements in production code
+- [ ] All TODO comments have corresponding GitHub issues
+- [ ] No hardcoded strings (use constants)
+- [ ] Proper error handling for all async operations
+- [ ] Accessibility labels for all interactive elements
+- [ ] Responsive design tested on multiple screen sizes
+- [ ] Dark mode support implemented
+- [ ] Performance impact assessed
+- [ ] Security implications reviewed
+- [ ] Documentation updated
 
-### Date & Time
-- **date-fns** - Date manipulation and formatting
-- Turkish locale as default (`tr-TR`)
+### Git Workflow
+- **Branch Naming**: feature/description, bugfix/description, hotfix/description
+- **Commit Messages**: Use conventional commits format
+- **Pull Requests**: Require at least one approval
+- **Code Reviews**: Focus on logic, performance, and security
+- **Merge Strategy**: Squash and merge for clean history
 
-### Security
-- **expo-secure-store** - Token storage
-- **jwt-decode** - JWT token parsing
-- NO custom encryption implementations
+### Environment Management
+- **Environment Variables**: Use .env files for configuration
+- **API Keys**: Never commit API keys to repository
+- **Feature Flags**: Use remote config for feature toggles
+- **Build Variants**: Separate staging and production configurations
+- **Secrets Management**: Use Expo Secrets for sensitive data
 
-### API Configuration
-- Base URL: `https://firms.modaps.eosdis.nasa.gov/api/`
-- JWT token stored in `src/utils/apiConfig.ts`
-- All API calls wrapped in try-catch blocks
+### Documentation Standards
+- **README Updates**: Update README for any new major features
+- **API Documentation**: Document all API endpoints and data structures
+- **Component Docs**: Include usage examples for complex components
+- **Architecture Decisions**: Document major architectural decisions in ADRs
+- **Onboarding Guide**: Maintain up-to-date setup instructions
 
-### File Structure Rules
-- `src/components/` - Reusable UI components
-- `src/screens/` - App screens/pages
-- `src/store/slices/` - Redux slices
-- `src/services/` - API service files
-- `src/utils/` - Helper functions
-- `src/types/` - TypeScript type definitions
-- `src/constants/` - App constants and configuration
-
-### Performance Guidelines
-- Use React.memo() for expensive components
-- Implement proper loading states
-- Debounce search inputs (use src/utils/debounce)
-- Lazy load heavy components
-- Optimize images with expo-image
-
-### Error Handling
-- Always show user-friendly error messages
-- Log errors to console in development
-- Use try-catch for all async operations
-- Implement proper error boundaries
-
-### Testing Requirements
-- Write unit tests for utility functions
-- Test API integration thoroughly
-- Test on both iOS and Android devices
-- Test offline functionality
-
-### Security Best Practices
-- NEVER store sensitive data in AsyncStorage
-- Use expo-secure-store for tokens
-- Validate all user inputs
-- Implement proper authentication flow
-- Use HTTPS for all API calls
-
-### Deployment Rules
-- Test on physical devices before release
-- Optimize bundle size with Metro config
-- Configure app.json properly
-- Set up proper app signing
-- Test push notifications on production
-
-### Code Style
-- Use TypeScript for all new files
-- Follow ESLint configuration
-- Use meaningful variable names
-- Add JSDoc comments for complex functions
-- Keep components under 200 lines
+### Deployment Pipeline
+- **Automated Testing**: Run tests on every PR
+- **Code Quality**: Use ESLint and Prettier checks
+- **Security Scanning**: Run security audits before deployment
+- **Performance Budget**: Monitor bundle size and performance metrics
+- **Rollback Plan**: Always have a rollback strategy for deployments
