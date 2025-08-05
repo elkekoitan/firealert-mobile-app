@@ -1,6 +1,6 @@
-
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { FireReport } from '../../types';
+import { getModisData } from '../../services/nasaApi';
 
 interface ReportsState {
   reports: FireReport[];
@@ -65,32 +65,15 @@ export const createReport = createAsyncThunk(
 export const fetchReports = createAsyncThunk(
   'reports/fetchAll',
   async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock data
-    const mockReports: FireReport[] = [
-      {
-        id: '1',
-        userId: '1',
-        userName: 'Test User',
-        latitude: 39.9334,
-        longitude: 32.8597,
-        images: ['https://i.abcnewsfe.com/a/d7a80f18-78b0-4f17-acb5-0cedeef3eb87/canada-fires-20242_1715556479391_hpMain.jpg
-        description: 'Ormanda duman görüldü',
-        aiAnalysis: {
-          confidence: 85,
-          detectedElements: ['smoke', 'vegetation'],
-          riskLevel: 'HIGH',
-          isLikelyFire: true,
-        },
-        status: 'VERIFIED',
-        reportedAt: new Date(Date.now() - 3600000).toISOString(),
-        emergency112Notified: true,
-      },
-    ];
-
-    return mockReports;
+    try {
+      // Fetch real data from NASA FIRMS API
+      const { latitude, longitude, radius } = { latitude: 39.9334, longitude: 32.8597, radius: 100 };
+      const data = await getModisData({ latitude, longitude, radius });
+      return data;
+    } catch (error) {
+      console.error('NASA API fetch error:', error);
+      throw error;
+    }
   }
 );
 
