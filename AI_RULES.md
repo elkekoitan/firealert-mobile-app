@@ -1,104 +1,129 @@
-## Additional Development Guidelines
+## Supabase Integration Rules
 
-### Component Architecture Rules
-- **Single Responsibility Principle**: Each component must have one clear purpose
-- **Maximum 200 lines per component**: Refactor immediately if exceeded
-- **Props Interface Definition**: Always define TypeScript interfaces for component props
-- **Default Props**: Use default parameters instead of defaultProps for functional components
-- **Memoization**: Use React.memo() for components that receive stable props
+### Database Schema Standards
+- **Table Naming**: Use snake_case for table names (e.g., `fire_reports`, `user_profiles`)
+- **Column Naming**: Use snake_case for column names
+- **Primary Keys**: Use UUID with `gen_random_uuid()` as default
+- **Timestamps**: Always include `created_at` and `updated_at` columns
+- **Foreign Keys**: Use `REFERENCES` with `ON DELETE CASCADE` for user relationships
 
-### State Management Best Practices
-- **Local vs Global State**: Use local state for UI-only data, Redux for app-wide state
-- **Async State**: Use createAsyncThunk for all async operations
-- **Loading States**: Always implement proper loading, error, and empty states
-- **Optimistic Updates**: Use optimistic updates for better UX, with rollback on error
-- **State Normalization**: Normalize complex state structures using createEntityAdapter
+### Row Level Security (RLS) - MANDATORY
+- **Enable RLS on ALL tables**: `ALTER TABLE table_name ENABLE ROW LEVEL SECURITY`
+- **Policies Required**: SELECT, INSERT, UPDATE, DELETE policies for each table
+- **User Isolation**: Users can only access their own data unless explicitly required
+- **Policy Pattern**: `auth.uid() = user_id` for user-specific data
+- **Public Access**: Only add public read policies when specifically requested
 
-### API Integration Rules
-- **Service Layer**: All API calls must go through services in `src/services/`
-- **Error Boundaries**: Wrap all API calls with proper error handling
-- **Retry Logic**: Implement exponential backoff for failed requests
-- **Caching Strategy**: Use RTK Query or custom caching for frequently accessed data
-- **Offline Support**: Implement offline queue for critical operations
+### Authentication Flow
+- **Supabase Auth**: Use Supabase Auth for all user authentication
+- **User Profiles**: Auto-create profile on signup via database trigger
+- **Session Management**: Use `onAuthStateChange` for session monitoring
+- **Token Storage**: Store tokens in expo-secure-store, never AsyncStorage
+- **Auto-redirect**: Redirect authenticated users to main app, others to login
 
-### Security Implementation
-- **Input Validation**: Validate all user inputs on both client and server
-- **XSS Prevention**: Never use dangerouslySetInnerHTML
-- **CSRF Protection**: Include CSRF tokens for state-changing operations
-- **Rate Limiting**: Implement client-side rate limiting for API calls
-- **Sensitive Data**: Never log sensitive information
+### Edge Functions
+- **Location**: Place in `supabase/functions/` directory
+- **Naming**: Use kebab-case for function names (e.g., `process-fire-report`)
+- **CORS**: Always include CORS headers in responses
+- **Error Handling**: Return proper HTTP status codes and error messages
+- **Logging**: Implement comprehensive logging for debugging
+
+### Real-time Subscriptions
+- **Channel Naming**: Use pattern: `fire-reports:user-${userId}`
+- **Cleanup**: Always unsubscribe in useEffect cleanup
+- **Error Handling**: Handle connection errors gracefully
+- **Reconnection**: Implement automatic reconnection logic
+
+### Storage Rules
+- **Bucket Structure**: 
+  - `fire-reports` - User uploaded fire photos
+  - `user-avatars` - Profile pictures
+  - `system-images` - App assets
+- **File Naming**: Use UUIDs with original extension
+- **Access Control**: Private by default, public only when needed
+- **Image Optimization**: Resize images before upload using expo-image-manipulator
+
+### API Integration Patterns
+```typescript
+// Preferred pattern for Supabase calls
+const { data, error } = await supabase
+  .from('fire_reports')
+  .select('*')
+  .eq('user_id', userId)
+  .order('created_at', { ascending: false })
+
+if (error) {
+  console.error('Error fetching reports:', error)
+  throw new Error(error.message)
+}
+
+return data
+```
+
+### Migration Standards
+- **File Naming**: Use timestamp + description (e.g., `20241201_create_fire_reports.sql`)
+- **Rollback Scripts**: Always include rollback statements
+- **Testing**: Test migrations on staging before production
+- **Documentation**: Document schema changes in commit messages
 
 ### Performance Optimization
-- **Image Optimization**: Use expo-image with proper sizing and caching
-- **Bundle Splitting**: Implement code splitting for large features
-- **Memory Management**: Clean up subscriptions and timers in useEffect
-- **List Performance**: Use FlatList with proper keyExtractor and getItemLayout
-- **Animation Performance**: Use nativeDriver for all animations
+- **Indexes**: Create indexes on frequently queried columns
+- **Query Limits**: Always use `.limit()` for list queries
+- **Pagination**: Use cursor-based pagination for large datasets
+- **Caching**: Implement query caching for static data
+- **Connection Pooling**: Use Supabase's built-in connection pooling
 
-### Testing Strategy
-- **Unit Tests**: Write tests for all utility functions and hooks
-- **Component Tests**: Use React Native Testing Library for component tests
-- **Integration Tests**: Test complete user flows with Detox
-- **Snapshot Tests**: Use sparingly, only for critical UI components
-- **Coverage**: Maintain minimum 80% test coverage
+### Security Checklist
+- [ ] RLS enabled on all tables
+- [ ] Policies restrict access appropriately
+- [ ] API keys stored in environment variables
+- [ ] Input validation on all user inputs
+- [ ] Rate limiting implemented
+- [ ] SQL injection prevention (use parameterized queries)
+- [ ] XSS prevention in stored content
+- [ ] File upload restrictions (type, size)
 
-### Accessibility Requirements
-- **Screen Reader Support**: All interactive elements must have accessibility labels
-- **Color Contrast**: Maintain WCAG 2.1 AA compliance for all colors
-- **Touch Targets**: Minimum 44x44px touch targets for all interactive elements
-- **Keyboard Navigation**: Support keyboard navigation on all screens
-- **Dynamic Type**: Support iOS Dynamic Type for text sizing
+### Monitoring & Alerts
+- **Database Performance**: Monitor query performance via Supabase dashboard
+- **Error Tracking**: Log all database errors to Sentry
+- **Usage Analytics**: Track API usage patterns
+- **Storage Monitoring**: Monitor storage usage and costs
+- **Real-time Connections**: Monitor WebSocket connection health
 
-### Internationalization (i18n)
-- **Default Language**: Turkish (tr-TR) as primary, English (en-US) as fallback
-- **Translation Keys**: Use meaningful keys, not English strings
-- **Pluralization**: Handle plural forms correctly using i18next
-- **RTL Support**: Prepare for potential RTL language support
-- **Date/Time**: Use locale-aware formatting with date-fns
+### Backup Strategy
+- **Automated Backups**: Enable daily automated backups
+- **Manual Backups**: Before major schema changes
+- **Retention Policy**: 30 days for automated backups
+- **Testing**: Regular restore testing on staging environment
+- **Documentation**: Document backup and restore procedures
 
-### Monitoring & Analytics
-- **Error Tracking**: Implement Sentry for error monitoring
-- **Performance Monitoring**: Track app startup time and screen transitions
-- **User Analytics**: Use privacy-focused analytics (no personal data)
-- **Crash Reporting**: Automatic crash reporting with user consent
-- **Feature Flags**: Use feature flags for gradual rollouts
+### Development Workflow
+1. **Local Development**: Use local Supabase CLI
+2. **Staging**: Deploy to staging environment first
+3. **Testing**: Run full test suite including integration tests
+4. **Production**: Deploy with zero-downtime strategy
+5. **Rollback**: Always have rollback plan ready
 
-### Code Review Checklist
-- [ ] No console.log statements in production code
-- [ ] All TODO comments have corresponding GitHub issues
-- [ ] No hardcoded strings (use constants)
-- [ ] Proper error handling for all async operations
-- [ ] Accessibility labels for all interactive elements
-- [ ] Responsive design tested on multiple screen sizes
-- [ ] Dark mode support implemented
-- [ ] Performance impact assessed
-- [ ] Security implications reviewed
-- [ ] Documentation updated
+### Common Patterns
+```typescript
+// User-specific query pattern
+const getUserReports = async (userId: string) => {
+  return await supabase
+    .from('fire_reports')
+    .select(`
+      *,
+      user:profiles!user_id(name, avatar_url)
+    `)
+    .eq('user_id', userId)
+}
 
-### Git Workflow
-- **Branch Naming**: feature/description, bugfix/description, hotfix/description
-- **Commit Messages**: Use conventional commits format
-- **Pull Requests**: Require at least one approval
-- **Code Reviews**: Focus on logic, performance, and security
-- **Merge Strategy**: Squash and merge for clean history
-
-### Environment Management
-- **Environment Variables**: Use .env files for configuration
-- **API Keys**: Never commit API keys to repository
-- **Feature Flags**: Use remote config for feature toggles
-- **Build Variants**: Separate staging and production configurations
-- **Secrets Management**: Use Expo Secrets for sensitive data
-
-### Documentation Standards
-- **README Updates**: Update README for any new major features
-- **API Documentation**: Document all API endpoints and data structures
-- **Component Docs**: Include usage examples for complex components
-- **Architecture Decisions**: Document major architectural decisions in ADRs
-- **Onboarding Guide**: Maintain up-to-date setup instructions
-
-### Deployment Pipeline
-- **Automated Testing**: Run tests on every PR
-- **Code Quality**: Use ESLint and Prettier checks
-- **Security Scanning**: Run security audits before deployment
-- **Performance Budget**: Monitor bundle size and performance metrics
-- **Rollback Plan**: Always have a rollback strategy for deployments
+// Real-time subscription pattern
+const subscribeToReports = (callback: (report: FireReport) => void) => {
+  return supabase
+    .channel('fire-reports')
+    .on('postgres_changes', 
+      { event: 'INSERT', schema: 'public', table: 'fire_reports' },
+      callback
+    )
+    .subscribe()
+}
