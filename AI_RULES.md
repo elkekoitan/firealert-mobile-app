@@ -1,129 +1,203 @@
-## Supabase Integration Rules
+## Final AI Rules & Deployment Guidelines
 
-### Database Schema Standards
-- **Table Naming**: Use snake_case for table names (e.g., `fire_reports`, `user_profiles`)
-- **Column Naming**: Use snake_case for column names
-- **Primary Keys**: Use UUID with `gen_random_uuid()` as default
-- **Timestamps**: Always include `created_at` and `updated_at` columns
-- **Foreign Keys**: Use `REFERENCES` with `ON DELETE CASCADE` for user relationships
+### Production Deployment Checklist
 
-### Row Level Security (RLS) - MANDATORY
-- **Enable RLS on ALL tables**: `ALTER TABLE table_name ENABLE ROW LEVEL SECURITY`
-- **Policies Required**: SELECT, INSERT, UPDATE, DELETE policies for each table
-- **User Isolation**: Users can only access their own data unless explicitly required
-- **Policy Pattern**: `auth.uid() = user_id` for user-specific data
-- **Public Access**: Only add public read policies when specifically requested
+#### Pre-Deployment Security Audit
+- [ ] **Environment Variables**: All sensitive keys moved to secure storage
+- [ ] **API Endpoints**: Verify all endpoints use HTTPS
+- [ ] **Bundle Analysis**: Check bundle size with Metro bundler
+- [ ] **Code Obfuscation**: Enable code obfuscation for production builds
+- [ ] **Certificate Pinning**: Implement SSL certificate pinning
+- [ ] **Root Detection**: Add root/jailbreak detection for security
 
-### Authentication Flow
-- **Supabase Auth**: Use Supabase Auth for all user authentication
-- **User Profiles**: Auto-create profile on signup via database trigger
-- **Session Management**: Use `onAuthStateChange` for session monitoring
-- **Token Storage**: Store tokens in expo-secure-store, never AsyncStorage
-- **Auto-redirect**: Redirect authenticated users to main app, others to login
+#### Performance Optimization
+- [ ] **Bundle Size**: Keep under 50MB for App Store compliance
+- [ ] **Startup Time**: Target <3 seconds cold start
+- [ ] **Memory Usage**: Monitor for memory leaks
+- [ ] **Battery Usage**: Optimize location services and background tasks
+- [ ] **Network Efficiency**: Implement request caching and compression
 
-### Edge Functions
-- **Location**: Place in `supabase/functions/` directory
-- **Naming**: Use kebab-case for function names (e.g., `process-fire-report`)
-- **CORS**: Always include CORS headers in responses
-- **Error Handling**: Return proper HTTP status codes and error messages
-- **Logging**: Implement comprehensive logging for debugging
+#### App Store Compliance
+- [ ] **Privacy Policy**: Create comprehensive privacy policy
+- [ ] **Terms of Service**: Update terms for user data handling
+- [ ] **Content Guidelines**: Ensure no prohibited content
+- [ ] **Age Rating**: Set appropriate age rating (12+ for fire alerts)
+- [ ] **Metadata**: Complete app store listing with screenshots
 
-### Real-time Subscriptions
-- **Channel Naming**: Use pattern: `fire-reports:user-${userId}`
-- **Cleanup**: Always unsubscribe in useEffect cleanup
-- **Error Handling**: Handle connection errors gracefully
-- **Reconnection**: Implement automatic reconnection logic
-
-### Storage Rules
-- **Bucket Structure**: 
-  - `fire-reports` - User uploaded fire photos
-  - `user-avatars` - Profile pictures
-  - `system-images` - App assets
-- **File Naming**: Use UUIDs with original extension
-- **Access Control**: Private by default, public only when needed
-- **Image Optimization**: Resize images before upload using expo-image-manipulator
-
-### API Integration Patterns
+#### Monitoring Setup
 ```typescript
-// Preferred pattern for Supabase calls
-const { data, error } = await supabase
-  .from('fire_reports')
-  .select('*')
-  .eq('user_id', userId)
-  .order('created_at', { ascending: false })
+// Error tracking configuration
+import * as Sentry from '@sentry/react-native';
 
-if (error) {
-  console.error('Error fetching reports:', error)
-  throw new Error(error.message)
-}
-
-return data
+Sentry.init({
+  dsn: 'YOUR_SENTRY_DSN',
+  environment: __DEV__ ? 'development' : 'production',
+  tracesSampleRate: 1.0,
+  beforeSend: (event) => {
+    // Filter out sensitive data
+    delete event.user?.email;
+    return event;
+  }
+});
 ```
 
-### Migration Standards
-- **File Naming**: Use timestamp + description (e.g., `20241201_create_fire_reports.sql`)
-- **Rollback Scripts**: Always include rollback statements
-- **Testing**: Test migrations on staging before production
-- **Documentation**: Document schema changes in commit messages
+### Emergency Response Procedures
 
-### Performance Optimization
-- **Indexes**: Create indexes on frequently queried columns
-- **Query Limits**: Always use `.limit()` for list queries
-- **Pagination**: Use cursor-based pagination for large datasets
-- **Caching**: Implement query caching for static data
-- **Connection Pooling**: Use Supabase's built-in connection pooling
+#### Critical Bug Response
+1. **Immediate Assessment**: Determine severity and user impact
+2. **Rollback Plan**: Prepare immediate rollback to previous stable version
+3. **Hotfix Deployment**: Deploy critical fixes via CodePush or store update
+4. **Communication**: Notify users via in-app notifications
+5. **Post-Mortem**: Document lessons learned
 
-### Security Checklist
-- [ ] RLS enabled on all tables
-- [ ] Policies restrict access appropriately
-- [ ] API keys stored in environment variables
-- [ ] Input validation on all user inputs
-- [ ] Rate limiting implemented
-- [ ] SQL injection prevention (use parameterized queries)
-- [ ] XSS prevention in stored content
-- [ ] File upload restrictions (type, size)
+#### Security Incident Response
+1. **Immediate Containment**: Disable affected features
+2. **User Notification**: Alert users if data potentially compromised
+3. **Investigation**: Conduct thorough security audit
+4. **Fix Deployment**: Deploy security patches immediately
+5. **Transparency Report**: Publish incident report if needed
 
-### Monitoring & Alerts
-- **Database Performance**: Monitor query performance via Supabase dashboard
-- **Error Tracking**: Log all database errors to Sentry
-- **Usage Analytics**: Track API usage patterns
-- **Storage Monitoring**: Monitor storage usage and costs
-- **Real-time Connections**: Monitor WebSocket connection health
+### Maintenance Schedule
 
-### Backup Strategy
-- **Automated Backups**: Enable daily automated backups
-- **Manual Backups**: Before major schema changes
-- **Retention Policy**: 30 days for automated backups
-- **Testing**: Regular restore testing on staging environment
-- **Documentation**: Document backup and restore procedures
+#### Weekly Tasks
+- [ ] Monitor crash reports and error logs
+- [ ] Review performance metrics
+- [ ] Check for dependency updates
+- [ ] Verify backup integrity
 
-### Development Workflow
-1. **Local Development**: Use local Supabase CLI
-2. **Staging**: Deploy to staging environment first
-3. **Testing**: Run full test suite including integration tests
-4. **Production**: Deploy with zero-downtime strategy
-5. **Rollback**: Always have rollback plan ready
+#### Monthly Tasks
+- [ ] Security vulnerability scan
+- [ ] Performance regression testing
+- [ ] User feedback analysis
+- [ ] Feature usage analytics review
 
-### Common Patterns
-```typescript
-// User-specific query pattern
-const getUserReports = async (userId: string) => {
-  return await supabase
-    .from('fire_reports')
-    .select(`
-      *,
-      user:profiles!user_id(name, avatar_url)
-    `)
-    .eq('user_id', userId)
-}
+#### Quarterly Tasks
+- [ ] Full security audit
+- [ ] Performance optimization review
+- [ ] Dependency major version updates
+- [ ] Disaster recovery testing
 
-// Real-time subscription pattern
-const subscribeToReports = (callback: (report: FireReport) => void) => {
-  return supabase
-    .channel('fire-reports')
-    .on('postgres_changes', 
-      { event: 'INSERT', schema: 'public', table: 'fire_reports' },
-      callback
-    )
-    .subscribe()
-}
+### Legal & Compliance
+
+#### GDPR Compliance
+- **Data Minimization**: Only collect necessary user data
+- **Right to Deletion**: Implement user data deletion endpoint
+- **Data Portability**: Allow users to export their data
+- **Consent Management**: Clear opt-in for data collection
+- **Privacy by Design**: Build privacy into all features
+
+#### COPPA Compliance (if targeting users under 13)
+- **Age Verification**: Implement age gate for users under 13
+- **Parental Consent**: Require parental consent for minors
+- **Limited Data Collection**: Restrict data collection for children
+
+### Continuous Integration Pipeline
+
+#### GitHub Actions Workflow
+```yaml
+name: Deploy FireAlert App
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm ci
+      - run: npm run test
+      - run: npm run lint
+      - run: npm run type-check
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: eas build --platform all --non-interactive
+```
+
+### Final Deployment Commands
+
+#### iOS App Store
+```bash
+# Build for production
+eas build --platform ios
+
+# Submit to App Store
+eas submit --platform ios
+```
+
+#### Google Play Store
+```bash
+# Build for production
+eas build --platform android
+
+# Submit to Play Store
+eas submit --platform android
+```
+
+### Post-Launch Monitoring
+
+#### Key Metrics to Track
+- **Daily Active Users (DAU)**
+- **Crash Rate** (target <1%)
+- **Average Session Duration**
+- **Feature Adoption Rate**
+- **User Retention (7-day, 30-day)**
+- **API Response Times**
+- **Error Rate by Endpoint**
+
+#### Alert Thresholds
+- **Crash Rate**: >0.5% triggers immediate investigation
+- **API Errors**: >5% error rate triggers alert
+- **Performance**: >3s response time triggers optimization
+- **User Complaints**: >10 similar complaints triggers review
+
+### Success Metrics Definition
+- **User Acquisition**: 1000+ downloads in first month
+- **Engagement**: 50%+ weekly active users
+- **Reliability**: 99.9% uptime for critical features
+- **User Satisfaction**: 4.5+ star rating on app stores
+- **Response Time**: <2s for all critical user actions
+
+### Final Checklist Before Launch
+- [ ] All tests passing
+- [ ] Security audit complete
+- [ ] Performance benchmarks met
+- [ ] App store assets ready
+- [ ] Privacy policy published
+- [ ] Support documentation ready
+- [ ] Rollback plan tested
+- [ ] Team on-call schedule established
+- [ ] Marketing materials prepared
+- [ ] User onboarding flow optimized
+
+### Emergency Contacts
+- **Technical Lead**: [Your Email]
+- **DevOps Team**: [DevOps Email]
+- **Security Team**: [Security Email]
+- **App Store Support**: Apple Developer Support / Google Play Console
+
+### Documentation Links
+- **API Documentation**: [Link to API docs]
+- **User Guide**: [Link to user guide]
+- **Developer Guide**: [Link to dev guide]
+- **Privacy Policy**: [Link to privacy policy]
+- **Terms of Service**: [Link to terms]
+
+### Final Notes
+This AI rules document serves as the single source of truth for all development decisions. Any changes must be approved by the technical lead and documented with version control. Regular reviews should be conducted quarterly to ensure all guidelines remain current and effective.
