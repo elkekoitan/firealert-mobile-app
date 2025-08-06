@@ -33,6 +33,10 @@ export const lightTheme = {
     outline: '#E0E0E0',
     outlineVariant: '#EEEEEE',
     
+    // Custom colors for compatibility
+    text: '#212121',
+    textSecondary: '#757575',
+    
     // Custom fire risk colors
     fireRisk: {
       low: '#4CAF50',      // Green
@@ -40,6 +44,20 @@ export const lightTheme = {
       high: '#FF5722',     // Red-orange
       critical: '#D32F2F'  // Dark red
     }
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48
+  },
+  borderRadius: {
+    sm: 4,
+    md: 8,
+    lg: 12,
+    xl: 16
   },
   fonts: {
     ...MD3LightTheme.fonts,
@@ -80,3 +98,6 @@ export const darkTheme = {
 };
 
 export default lightTheme;
+
+// Export as theme for convenience
+export const theme = lightTheme;

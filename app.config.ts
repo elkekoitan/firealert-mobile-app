@@ -7,6 +7,7 @@ export default ({ config }: ConfigContext) => ({
     slug: 'firealert-mobile',
     version: '0.1.0',
     orientation: 'portrait',
+    privacy: 'public',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     splash: {
@@ -38,10 +39,30 @@ export default ({ config }: ConfigContext) => ({
       favicon: './assets/favicon.png',
       bundler: 'metro',
     },
+    scheme: 'firealert',
+    intentFilters: [
+      {
+        action: 'VIEW',
+        data: [
+          {
+            scheme: 'firealert',
+          },
+        ],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
     plugins: [
       'expo-camera',
       'expo-location',
-      'expo-notifications',
+      [
+        'expo-notifications',
+        {
+          icon: './assets/notification-icon.png',
+          color: '#FF5722',
+          defaultChannel: 'default',
+          sounds: ['./assets/notification.wav'],
+        },
+      ],
       'expo-secure-store',
     ],
     extra: {

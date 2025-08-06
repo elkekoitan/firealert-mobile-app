@@ -1,57 +1,58 @@
-// Neden özel bir HttpExceptionFilter?
-// - Tüm hataları tutarlı bir JSON formatında döndürmek, frontend'in hata yönetimini kolaylaştırır.
-// - Üretimde hassas bilgileri sızdırmamak; geliştirmede yeterli bağlam sağlamak.
-// - Loglama ile korelasyon: isteğe dair meta bilgileri kayda geçirmek.
-
 import {
-  ArgumentsHost,
-  Catch,
   ExceptionFilter,
+  Catch,
+  ArgumentsHost,
   HttpException,
-  HttpStatus,
+  Logger,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 
-@Catch()
+@Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
-    const request = ctx.getRequest();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+    const errorResponse = exception.getResponse();
 
-    // Varsayılan hata (beklenmeyen durumlar için 500)
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message: any =
-      'Internal Server Error. Please contact support if the problem persists.';
-    let details: any = undefined;
+    let message: string;
+    let validationErrors: any[] = [];
 
-    if (exception instanceof HttpException) {
-      status = exception.getStatus();
-      const res: any = exception.getResponse?.();
-      // Nest standard response: { statusCode, message, error }
-      message = (res && res.message) || exception.message || 'Error';
-      details = res && res.error ? res.error : undefined;
-    } else if (exception && typeof exception === 'object') {
-      // Diğer hatalar (ör. ZodError, validation kütüphaneleri vb.)
-      message = (exception as any).message || message;
-      details = (exception as any).details || undefined;
+    if (typeof errorResponse === 'object' && errorResponse !== null) {
+      const errorObj = errorResponse as any;
+      message = errorObj.message;
+      
+      // Handle validation errors from class-validator
+      if (Array.isArray(errorObj.message)) {
+        validationErrors = errorObj.message;
+        message = 'Validation failed';
+      }
+    } else {
+      message = errorResponse as string;
     }
 
-    // Basit log (ileride LoggingInterceptor ile zenginleştirilecek)
-    // eslint-disable-next-line no-console
-    console.error('[HttpExceptionFilter]', {
-      method: request.method,
-      url: request.url,
-      status,
-      message,
-    });
+    // Log the error
+    this.logger.warn(
+      `[${request.method}] ${request.url} - ${status} - ${message}`,
+    );
 
-    return response.status(status).json({
+    // Send standardized error response
+    const responseBody = {
       success: false,
       statusCode: status,
-      path: request.url,
       timestamp: new Date().toISOString(),
-      message,
-      details,
-    });
+      path: request.url,
+      method: request.method,
+      error: {
+        code: 'HTTP_EXCEPTION',
+        message,
+        ...(validationErrors.length > 0 && { validationErrors }),
+      },
+    };
+
+    response.status(status).json(responseBody);
   }
 }

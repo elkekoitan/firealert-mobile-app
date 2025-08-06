@@ -46,6 +46,11 @@ const config = {
   },
   optimizeDeps: {
     exclude: ["react-native", "react-native-maps"],
+    esbuildOptions: {
+      loader: {
+        ".js": "jsx",
+      },
+    },
   },
 };
 

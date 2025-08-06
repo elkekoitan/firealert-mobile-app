@@ -7,6 +7,7 @@ export type RootStackParamList = {
 };
 
 export type AuthStackParamList = {
+  Onboarding: undefined;
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
@@ -17,6 +18,7 @@ export type MainTabParamList = {
   Reports: undefined;
   Alerts: undefined;
   Settings: undefined;
+  Subscription: undefined;
 };
 
 declare global {

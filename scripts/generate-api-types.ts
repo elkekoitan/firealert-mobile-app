@@ -53,7 +53,7 @@ export type ApiComponents = typeof paths['components'];
   writeFileSync(typesPath, enhancedContent);
   
   console.log('✅ OpenAPI tip üretimi başarıyla tamamlandı!');
-  console.log('🚀 Artık API endpoint'lerini kullanabilirsiniz.');
+  console.log("🚀 Artık API endpoint'lerini kullanabilirsiniz.");
   
 } catch (error) {
   console.error('❌ OpenAPI tip üretiminde hata oluştu:', error);

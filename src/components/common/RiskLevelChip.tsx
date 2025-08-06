@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Chip } from 'react-native-paper';
 import { RiskLevel } from '../../types/enums';
 import { formatRiskLevel } from '../../utils/stringFormatters';
@@ -9,7 +9,7 @@ interface RiskLevelChipProps {
   size?: 'small' | 'medium';
 }
 
-export const RiskLevelChip: React.FC<RiskLevelChipProps> = ({ 
+export const RiskLevelChip: React.FC<RiskLevelChipProps> = memo(({ 
   riskLevel, 
   mode = 'outlined',
   size = 'medium'
@@ -43,4 +43,4 @@ export const RiskLevelChip: React.FC<RiskLevelChipProps> = ({
       {formatRiskLevel(riskLevel)}
     </Chip>
   );
-};
+});

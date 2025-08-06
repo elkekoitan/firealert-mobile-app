@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Image, Alert, ActivityIndicator, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Button, Image, Alert, ActivityIndicator, ScrollView, TextInput, ProgressBarAndroid, ProgressViewIOS, Platform } from 'react-native';
 import { COLORS, SIZES } from '../constants';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import { useForm, Controller } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { useFireReports } from '../hooks/useSupabase';
 import { FireReport } from '../types';
+import { useImageUpload, ImageUploadResult } from '../services/imageUpload';
+import { useLocation } from '../services/locationService';
+import { useCameraError } from '../hooks/useCameraError';
+import { useLocationError } from '../hooks/useLocationError';
 
 type ReportFormData = {
   description: string;
-  images: string[];
+  imageUris: string[];
   latitude: number;
   longitude: number;
 };
@@ -20,88 +23,125 @@ const ReportScreen = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const { createReport, loading: isSubmitting } = useFireReports();
+  const { uploadMultipleImages, uploading, progress, error: uploadError, resetState } = useImageUpload();
+  const { location, loading: locationLoading, getCurrentLocation, requestPermissions } = useLocation();
+  const { handleCameraError } = useCameraError();
+  const { handleLocationError } = useLocationError();
+  
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
+  const [permissionsGranted, setPermissionsGranted] = useState({
+    camera: false,
+    mediaLibrary: false,
+    location: false,
+  });
 
   const { control, handleSubmit, setValue, formState: { errors } } = useForm<ReportFormData>({
     defaultValues: {
       description: '',
-      images: [],
+      imageUris: [],
       latitude: 0,
       longitude: 0,
     },
   });
 
   useEffect(() => {
-    (async () => {
-      const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-      const { status: mediaLibraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
+    const checkPermissions = async () => {
+      try {
+        const [cameraResult, mediaResult] = await Promise.all([
+          ImagePicker.requestCameraPermissionsAsync(),
+          ImagePicker.requestMediaLibraryPermissionsAsync(),
+        ]);
+        
+        const locationResult = await requestPermissions();
+        
+        setPermissionsGranted({
+          camera: cameraResult.status === 'granted',
+          mediaLibrary: mediaResult.status === 'granted',
+          location: locationResult.granted,
+        });
+        
+        if (!cameraResult.granted || !mediaResult.granted) {
+          Alert.alert('İzin Gerekli', 'Fotoğraf çekmek veya seçmek için kamera ve medya kütüphanesi izinleri gerekli.');
+        }
+        if (!locationResult.granted) {
+          Alert.alert('İzin Gerekli', 'Konum bilgisi almak için konum izni gerekli.');
+        }
+      } catch (error) {
+        console.error('Permission check error:', error);
+      }
+    };
 
-      if (cameraStatus !== 'granted' || mediaLibraryStatus !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Fotoğraf çekmek veya seçmek için kamera ve medya kütüphanesi izinleri gerekli.');
-      }
-      if (locationStatus !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Konum bilgisi almak için konum izni gerekli.');
-      }
-    })();
-  }, []);
+    checkPermissions();
+  }, [requestPermissions]);
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-      base64: true, // Supabase Storage için base64 gerekli olabilir
-    });
+    try {
+      if (!permissionsGranted.mediaLibrary) {
+        Alert.alert('İzin Gerekli', 'Galeri erişimi için izin gerekli.');
+        return;
+      }
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const newImageUri = result.assets[0].uri;
-      setSelectedImages(prev => [...prev, newImageUri]);
-      setValue('images', [...selectedImages, newImageUri]);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        allowsMultipleSelection: false,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImageUri = result.assets[0].uri;
+        setSelectedImages(prev => [...prev, newImageUri]);
+        setValue('imageUris', [...selectedImages, newImageUri]);
+      }
+    } catch (error) {
+      handleCameraError(error);
     }
   };
 
   const takePhoto = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-      base64: true, // Supabase Storage için base64 gerekli olabilir
-    });
+    try {
+      if (!permissionsGranted.camera) {
+        Alert.alert('İzin Gerekli', 'Kamera erişimi için izin gerekli.');
+        return;
+      }
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const newImageUri = result.assets[0].uri;
-      setSelectedImages(prev => [...prev, newImageUri]);
-      setValue('images', [...selectedImages, newImageUri]);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImageUri = result.assets[0].uri;
+        setSelectedImages(prev => [...prev, newImageUri]);
+        setValue('imageUris', [...selectedImages, newImageUri]);
+      }
+    } catch (error) {
+      handleCameraError(error);
     }
   };
 
   const getLocation = async () => {
-    setLocationLoading(true);
     try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      if (!permissionsGranted.location) {
         Alert.alert('Konum İzni', 'Konum bilgisi almak için izin gerekli.');
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setCurrentLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-      setValue('latitude', location.coords.latitude);
-      setValue('longitude', location.coords.longitude);
-      Alert.alert('Konum Alındı', `Enlem: ${location.coords.latitude.toFixed(4)}, Boylam: ${location.coords.longitude.toFixed(4)}`);
+      const locationData = await getCurrentLocation();
+      if (locationData) {
+        setValue('latitude', locationData.latitude);
+        setValue('longitude', locationData.longitude);
+        Alert.alert(
+          'Konum Alındı', 
+          `Enlem: ${locationData.latitude.toFixed(4)}, Boylam: ${locationData.longitude.toFixed(4)}\nDoğruluk: ${locationData.accuracy.toFixed(0)}m`
+        );
+      }
     } catch (error) {
-      console.error('Konum alma hatası:', error);
-      Alert.alert('Hata', 'Konum alınamadı. Lütfen tekrar deneyin.');
-    } finally {
-      setLocationLoading(false);
+      handleLocationError(error);
     }
   };
 
@@ -110,16 +150,41 @@ const ReportScreen = () => {
       Alert.alert('Hata', 'Rapor göndermek için giriş yapmalısınız.');
       return;
     }
-    if (data.images.length === 0) {
+    if (data.imageUris.length === 0) {
       Alert.alert('Hata', 'Lütfen en az bir fotoğraf ekleyin.');
       return;
     }
-    if (!currentLocation) {
+    if (!location && (data.latitude === 0 || data.longitude === 0)) {
       Alert.alert('Hata', 'Lütfen konum bilginizi alın.');
       return;
     }
 
     try {
+      // Reset upload state
+      resetState();
+      
+      // Use current location if available, otherwise use form data
+      const reportLocation = location || { latitude: data.latitude, longitude: data.longitude };
+      
+      // Upload images to Supabase Storage first
+      const uploadResults = await uploadMultipleImages(
+        data.imageUris,
+        user.id,
+        {
+          compression: 0.8,
+          width: 1920,
+          height: 1080,
+          quality: 0.8,
+        }
+      );
+      
+      if (uploadResults.length === 0) {
+        Alert.alert('Hata', 'Fotoğraflar yüklenemedi. Lütfen tekrar deneyin.');
+        return;
+      }
+      
+      setUploadedImages(uploadResults);
+      
       // Dinamik AI Analizi oluşturma
       const confidence = Math.random() * 0.4 + 0.6; // 60-100%
       const detectedElements = ['smoke', 'fire', 'vegetation']; // Örnek elementler
@@ -136,18 +201,18 @@ const ReportScreen = () => {
 
       const newReport: Omit<FireReport, 'id' | 'reportedAt' | 'status'> = {
         userId: user.id,
-        userName: user.name || user.email, // Kullanıcı adı veya e-posta
-        latitude: data.latitude,
-        longitude: data.longitude,
-        images: data.images,
+        userName: user.name || user.email,
+        latitude: reportLocation.latitude,
+        longitude: reportLocation.longitude,
+        images: uploadResults.map(result => result.publicUrl), // Use uploaded image URLs
         description: data.description,
         aiAnalysis: aiAnalysisResult,
-        emergency112Notified: aiAnalysisResult.riskLevel === 'CRITICAL', // Risk seviyesine göre ayarlandı
+        emergency112Notified: aiAnalysisResult.riskLevel === 'CRITICAL',
       };
 
       await createReport(newReport);
       Alert.alert('Başarılı', 'Yangın raporunuz başarıyla gönderildi!');
-      navigation.goBack(); // Rapor gönderildikten sonra ana ekrana dön
+      navigation.goBack();
     } catch (error) {
       console.error('Rapor gönderme hatası:', error);
       Alert.alert('Hata', 'Rapor gönderilirken bir sorun oluştu. Lütfen tekrar deneyin.');
@@ -161,20 +226,51 @@ const ReportScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Fotoğraf Ekle</Text>
         <View style={styles.buttonGroup}>
-          <Button title="Galeriden Seç" onPress={pickImage} color={COLORS.secondary} />
+          <Button title="Galeriden Seç" onPress={pickImage} color={COLORS.secondary} disabled={uploading} />
           <View style={{ width: SIZES.base }} />
-          <Button title="Fotoğraf Çek" onPress={takePhoto} color={COLORS.secondary} />
+          <Button title="Fotoğraf Çek" onPress={takePhoto} color={COLORS.secondary} disabled={uploading} />
         </View>
+        
+        {/* Upload Progress */}
+        {uploading && (
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>Yükleniyor... {progress.percentage.toFixed(0)}%</Text>
+            {Platform.OS === 'ios' ? (
+              <ProgressViewIOS progress={progress.percentage / 100} style={styles.progressBar} />
+            ) : (
+              <ProgressBarAndroid 
+                styleAttr="Horizontal" 
+                indeterminate={false} 
+                progress={progress.percentage / 100} 
+                color={COLORS.primary}
+                style={styles.progressBar}
+              />
+            )}
+          </View>
+        )}
+        
+        {/* Upload Error */}
+        {uploadError && (
+          <Text style={styles.errorText}>Yükleme hatası: {uploadError}</Text>
+        )}
+        
         <View style={styles.imagePreviewContainer}>
           {selectedImages.length === 0 ? (
             <Text style={styles.noImageText}>Henüz fotoğraf seçilmedi.</Text>
           ) : (
             selectedImages.map((uri, index) => (
-              <Image key={index} source={{ uri }} style={styles.imagePreview} />
+              <View key={index} style={styles.imageContainer}>
+                <Image source={{ uri }} style={styles.imagePreview} />
+                {uploadedImages[index] && (
+                  <View style={styles.uploadBadge}>
+                    <Text style={styles.uploadBadgeText}>✓</Text>
+                  </View>
+                )}
+              </View>
             ))
           )}
         </View>
-        {errors.images && <Text style={styles.errorText}>Lütfen en az bir fotoğraf ekleyin.</Text>}
+        {errors.imageUris && <Text style={styles.errorText}>Lütfen en az bir fotoğraf ekleyin.</Text>}
       </View>
 
       <View style={styles.section}>
@@ -182,13 +278,21 @@ const ReportScreen = () => {
         <Button
           title={locationLoading ? "Konum Alınıyor..." : "Konumumu Al"}
           onPress={getLocation}
-          disabled={locationLoading}
+          disabled={locationLoading || uploading}
           color={COLORS.info}
         />
-        {currentLocation && (
-          <Text style={styles.locationText}>
-            Enlem: {currentLocation.latitude.toFixed(4)}, Boylam: {currentLocation.longitude.toFixed(4)}
-          </Text>
+        {location && (
+          <View style={styles.locationInfo}>
+            <Text style={styles.locationText}>
+              Enlem: {location.latitude.toFixed(4)}, Boylam: {location.longitude.toFixed(4)}
+            </Text>
+            <Text style={styles.locationAccuracy}>
+              Doğruluk: {location.accuracy.toFixed(0)}m | Kaynak: {location.source}
+            </Text>
+            <Text style={styles.locationTime}>
+              Güncelleme: {new Date(location.timestamp).toLocaleTimeString('tr-TR')}
+            </Text>
+          </View>
         )}
         {errors.latitude && <Text style={styles.errorText}>Konum bilgisi gerekli.</Text>}
       </View>
@@ -216,12 +320,14 @@ const ReportScreen = () => {
       </View>
 
       <Button
-        title={isSubmitting ? "Rapor Gönderiliyor..." : "Raporu Gönder"}
+        title={uploading ? "Fotoğraflar Yükleniyor..." : isSubmitting ? "Rapor Gönderiliyor..." : "Raporu Gönder"}
         onPress={handleSubmit(onSubmit)}
-        disabled={isSubmitting}
+        disabled={isSubmitting || uploading || locationLoading}
         color={COLORS.primary}
       />
-      {isSubmitting && <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingIndicator} />}
+      {(isSubmitting || uploading) && (
+        <ActivityIndicator size="large" color={COLORS.primary} style={styles.loadingIndicator} />
+      )}
 
       <View style={styles.backButtonContainer}>
         <Button title="Geri Dön" onPress={() => navigation.goBack()} color={COLORS.text.secondary} />
@@ -274,13 +380,46 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
+  imageContainer: {
+    position: 'relative',
+    margin: SIZES.base / 2,
+  },
   imagePreview: {
     width: 100,
     height: 100,
     borderRadius: SIZES.radius / 2,
-    margin: SIZES.base / 2,
     borderWidth: 1,
     borderColor: COLORS.text.disabled,
+  },
+  uploadBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: COLORS.success,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    marginTop: SIZES.base,
+    marginBottom: SIZES.base,
+  },
+  progressText: {
+    textAlign: 'center',
+    marginBottom: SIZES.base / 2,
+    color: COLORS.text.secondary,
+    fontSize: SIZES.caption,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
   },
   noImageText: {
     color: COLORS.text.secondary,
@@ -288,10 +427,28 @@ const styles = StyleSheet.create({
     marginTop: SIZES.base,
   },
   locationText: {
-    marginTop: SIZES.base,
     fontSize: SIZES.body,
     color: COLORS.text.secondary,
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  locationInfo: {
+    marginTop: SIZES.base,
+    padding: SIZES.base,
+    backgroundColor: COLORS.background,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: COLORS.text.disabled,
+  },
+  locationAccuracy: {
+    fontSize: SIZES.caption,
+    color: COLORS.text.secondary,
+    marginTop: SIZES.base / 2,
+  },
+  locationTime: {
+    fontSize: SIZES.caption,
+    color: COLORS.text.disabled,
+    marginTop: SIZES.base / 2,
+    fontStyle: 'italic',
   },
   textArea: {
     height: 100,

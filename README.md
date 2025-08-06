@@ -1,54 +1,30 @@
-# React + TypeScript + Vite
+# FireAlert Mobile App (Expo + TypeScript)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+FireAlert is a cross‑platform mobile app built with Expo and React Native. This repository contains the mobile client, local NestJS backend for OpenAPI, and a comprehensive documentation set under `docs/`.
 
-Currently, two official plugins are available:
+## Quick Start
+- Install: `npm install`
+- Run (Expo): `npm start`
+- Platforms: `npm run android` | `npm run ios` | `npm run web`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Quality & Tests
+- Lint: `npm run lint`
+- Types: `npm run type-check`
+- Unit tests: `npm test` | watch `npm run test:watch` | coverage `npm run test:coverage`
+- E2E (Detox): `npm run build:e2e` then `npm run test:e2e`
 
-## Expanding the ESLint configuration
+## API Types (OpenAPI)
+- Generate types: `npm run types:generate`
+- Or start local backend + generate: `npm run generate:openapi`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Docs & Guides
+- Start with: `docs/README.md` (index)
+- Canonical guide: `docs/firealert-all-in-one.md`
+- Contributor guide: `AGENTS.md`
+- Deployment, privacy, test reports: under `docs/` (eski/alternatif içerikler `docs/archived/`)
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-});
-```
+## Environment
+- Do not commit secrets. Copy `.env.example` to `.env.local` (or `.env.development`, `.env.staging`, `.env.production`) and fill values.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    "react-x": reactX,
-    "react-dom": reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs["recommended-typescript"].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-});
-```
+---
+For full details, see the documentation index at `docs/README.md`.

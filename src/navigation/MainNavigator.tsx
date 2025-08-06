@@ -1,15 +1,53 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { View, Text } from 'react-native';
 import { MainTabParamList } from './types';
 import { MapScreen } from '../screens/main/MapScreen';
 import { ReportsScreen } from '../screens/main/ReportsScreen';
 import { AlertsScreen } from '../screens/main/AlertsScreen';
 import { SettingsScreen } from '../screens/main/SettingsScreen';
-import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
-import MapOutlinedIcon from '@mui/icons-material/MapOutlined';
-import ReportOutlinedIcon from '@mui/icons-material/ReportOutlined';
-import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import { SubscriptionScreen } from '../screens/main/SubscriptionScreen';
+import { theme } from '../theme/theme';
+
+// Icon component for React Native
+const TabIcon = ({ focused, color, name }: { focused: boolean; color: string; name: string }) => {
+  const iconSize = 24;
+  
+  // Simple icon representation using text
+  const getIcon = () => {
+    switch (name) {
+      case 'Map':
+        return '🗺️';
+      case 'Reports':
+        return '📋';
+      case 'Alerts':
+        return '🚨';
+      case 'Settings':
+        return '⚙️';
+      case 'Subscription':
+        return '💎';
+      default:
+        return '📱';
+    }
+  };
+
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: iconSize, color: focused ? theme.colors.primary : color }}>
+        {getIcon()}
+      </Text>
+      {focused && (
+        <View style={{
+          width: 4,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: theme.colors.primary,
+          marginTop: 2,
+        }} />
+      )}
+    </View>
+  );
+};
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -18,15 +56,28 @@ export const MainNavigator: React.FC = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#FF5722',
-        tabBarInactiveTintColor: '#757575',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.colors.surface,
           borderTopWidth: 1,
-          borderTopColor: '#E0E0E0',
+          borderTopColor: theme.colors.outline,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: {
+            width: 0,
+            height: -2,
+          },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          marginTop: 4,
         },
       }}
     >
@@ -35,9 +86,10 @@ export const MainNavigator: React.FC = () => {
         component={MapScreen}
         options={{
           title: 'Harita',
-          tabBarIcon: ({ color, size }) => (
-            <MapOutlinedIcon style={{ fontSize: size, color }} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} color={color} name="Map" />
           ),
+          tabBarLabel: 'Harita',
         }}
       />
       <Tab.Screen
@@ -45,9 +97,10 @@ export const MainNavigator: React.FC = () => {
         component={ReportsScreen}
         options={{
           title: 'Raporlar',
-          tabBarIcon: ({ color, size }) => (
-            <ReportOutlinedIcon style={{ fontSize: size, color }} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} color={color} name="Reports" />
           ),
+          tabBarLabel: 'Raporlar',
         }}
       />
       <Tab.Screen
@@ -55,9 +108,10 @@ export const MainNavigator: React.FC = () => {
         component={AlertsScreen}
         options={{
           title: 'Uyarılar',
-          tabBarIcon: ({ color, size }) => (
-            <NotificationsOutlinedIcon style={{ fontSize: size, color }} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} color={color} name="Alerts" />
           ),
+          tabBarLabel: 'Uyarılar',
         }}
       />
       <Tab.Screen
@@ -65,11 +119,25 @@ export const MainNavigator: React.FC = () => {
         component={SettingsScreen}
         options={{
           title: 'Ayarlar',
-          tabBarIcon: ({ color, size }) => (
-            <SettingsOutlinedIcon style={{ fontSize: size, color }} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} color={color} name="Settings" />
           ),
+          tabBarLabel: 'Ayarlar',
+        }}
+      />
+      <Tab.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
+        options={{
+          title: 'Premium',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} color={color} name="Subscription" />
+          ),
+          tabBarLabel: 'Premium',
         }}
       />
     </Tab.Navigator>
   );
 };
+
+export default MainNavigator;

@@ -1,190 +1,434 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, TextInput, Button, Surface } from 'react-native-paper';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useAppDispatch, useAppSelector } from '../../hooks/redux';
-import { registerUser } from '../../store/slices/authSlice';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { useDispatch, useSelector } from 'react-redux';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useNetInfo } from '@react-native-netinfo/netinfo';
+
+import { CustomButton } from '../../components/common/CustomButton';
+import { Input } from '../../components/common/Input';
+import { Checkbox } from '../../components/common/Checkbox';
+import { ErrorBoundary } from '../../components/common/ErrorBoundary';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { registerUser, clearError } from '../../store/slices/authSlice';
+import { registerSchema, type RegisterFormData } from '../../utils/validations';
+import { theme } from '../../theme/theme';
+import { useAppSelector } from '../../hooks/redux';
 
 export const RegisterScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  const dispatch = useAppDispatch();
+  const dispatch = useDispatch();
+  const { isConnected } = useNetworkStatus();
   const { isLoading, error } = useAppSelector(state => state.auth);
 
-  const handleRegister = () => {
-    if (isFormValid) {
-      dispatch(registerUser({ 
-        email: email.trim(), 
-        password, 
-        name: name.trim(),
-        phone: phone.trim() || undefined
-      }));
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+      firstName: '',
+      lastName: '',
+      agreeToTerms: false,
+      privacyPolicy: false,
+    },
+  });
+
+  const onSubmit = async (data: RegisterFormData) => {
+    if (!isConnected) {
+      Alert.alert('Bağlantı Hatası', 'İnternet bağlantınızı kontrol edin');
+      return;
+    }
+
+    try {
+      await dispatch(registerUser({
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      })).unwrap();
+      
+      Alert.alert(
+        'Kayıt Başarılı',
+        'Hesabınız oluşturuldu. Giriş yapabilirsiniz.',
+        [
+          { 
+            text: 'Tamam', 
+            onPress: () => navigation.navigate('Login') 
+          }
+        ]
+      );
+    } catch (err: any) {
+      console.error('Register error:', err);
     }
   };
 
-  const isFormValid = 
-    email.trim().length > 0 && 
-    password.length >= 6 && 
-    confirmPassword === password &&
-    name.trim().length > 0;
+  const handleLogin = () => {
+    navigation.navigate('Login');
+  };
 
-  if (isLoading) {
-    return <LoadingSpinner message="Kayıt yapılıyor..." />;
-  }
+  const handleGoogleRegister = () => {
+    Alert.alert('Google Kaydı', 'Bu özellik yakında eklenecek');
+  };
+
+  const handleAppleRegister = () => {
+    Alert.alert('Apple Kaydı', 'Bu özellik yakında eklenecek');
+  };
+
+  React.useEffect(() => {
+    if (error) {
+      Alert.alert('Kayıt Hatası', error);
+      dispatch(clearError());
+    }
+  }, [error, dispatch]);
 
   return (
-    <ScrollView style={styles.container}>
-      <Surface style={styles.surface}>
+    <ErrorBoundary>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
-          <Text variant="headlineMedium" style={styles.title}>
-            FireAlert
-          </Text>
-          <Text variant="bodyLarge" style={styles.subtitle}>
-            Yeni hesap oluşturun
-          </Text>
+          <Text style={styles.title}>FireAlert</Text>
+          <Text style={styles.subtitle}>Yangın Erken Uyarı Sistemi</Text>
         </View>
 
-        <View style={styles.form}>
-          <TextInput
-            label="Ad Soyad"
-            value={name}
-            onChangeText={setName}
-            mode="outlined"
-            autoCapitalize="words"
-            style={styles.input}
-          />
+        <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>Kayıt Ol</Text>
+          <Text style={styles.formSubtitle}>
+            Hesap oluşturarak topluluğa katkıda bulunabilirsiniz
+          </Text>
 
-          <TextInput
-            label="E-posta"
-            value={email}
-            onChangeText={setEmail}
-            mode="outlined"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            style={styles.input}
-          />
-
-          <TextInput
-            label="Telefon (Opsiyonel)"
-            value={phone}
-            onChangeText={setPhone}
-            mode="outlined"
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            style={styles.input}
-          />
-
-          <TextInput
-            label="Şifre"
-            value={password}
-            onChangeText={setPassword}
-            mode="outlined"
-            secureTextEntry={!showPassword}
-            autoComplete="new-password"
-            right={
-              <TextInput.Icon
-                icon={showPassword ? 'eye-off' : 'eye'}
-                onPress={() => setShowPassword(!showPassword)}
+          <View style={styles.form}>
+            <View style={styles.nameRow}>
+              <Controller
+                name="firstName"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="Ad"
+                    value={value}
+                    onChangeText={onChange}
+                    placeholder="Adınız"
+                    containerStyle={styles.nameInput}
+                    error={errors.firstName?.message}
+                    leftIcon="account"
+                  />
+                )}
               />
-            }
-            style={styles.input}
-          />
 
-          <TextInput
-            label="Şifre Tekrar"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            mode="outlined"
-            secureTextEntry={!showConfirmPassword}
-            right={
-              <TextInput.Icon
-                icon={showConfirmPassword ? 'eye-off' : 'eye'}
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              <Controller
+                name="lastName"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <Input
+                    label="Soyad"
+                    value={value}
+                    onChangeText={onChange}
+                    placeholder="Soyadınız"
+                    containerStyle={styles.nameInput}
+                    error={errors.lastName?.message}
+                    leftIcon="account"
+                  />
+                )}
               />
-            }
-            style={styles.input}
-            error={confirmPassword.length > 0 && confirmPassword !== password}
-          />
+            </View>
 
-          {confirmPassword.length > 0 && confirmPassword !== password && (
-            <Text variant="bodySmall" style={styles.error}>
-              Şifreler eşleşmiyor
-            </Text>
-          )}
+            <Controller
+              name="email"
+              control={control}
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="E-posta"
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="ornek@email.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  error={errors.email?.message}
+                  leftIcon="email"
+                />
+              )}
+            />
 
-          {error && (
-            <Text variant="bodySmall" style={styles.error}>
-              {error}
-            </Text>
-          )}
+            <Controller
+              name="password"
+              control={control}
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Şifre"
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  error={errors.password?.message}
+                  leftIcon="lock"
+                />
+              )}
+            />
 
-          <Button
-            mode="contained"
-            onPress={handleRegister}
-            disabled={!isFormValid}
-            style={styles.button}
-          >
-            Kayıt Ol
-          </Button>
+            <Controller
+              name="confirmPassword"
+              control={control}
+              render={({ field: { onChange, value } }) => (
+                <Input
+                  label="Şifreyi Onayla"
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  error={errors.confirmPassword?.message}
+                  leftIcon="lock-check"
+                />
+              )}
+            />
 
-          <Button
-            mode="text"
-            onPress={() => navigation.navigate('Login')}
-            style={styles.textButton}
-          >
-            Zaten hesabınız var mı? Giriş yapın
-          </Button>
+            <View style={styles.termsContainer}>
+              <Controller
+                name="agreeToTerms"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <Checkbox
+                    label="Kullanım Koşulları'nı kabul ediyorum"
+                    checked={value}
+                    onChange={onChange}
+                    error={errors.agreeToTerms?.message}
+                  />
+                )}
+              />
+
+              <Controller
+                name="privacyPolicy"
+                control={control}
+                render={({ field: { onChange, value } }) => (
+                  <Checkbox
+                    label="Gizlilik Politikası'nı kabul ediyorum"
+                    checked={value}
+                    onChange={onChange}
+                    error={errors.privacyPolicy?.message}
+                  />
+                )}
+              />
+            </View>
+
+            <View style={styles.passwordRequirements}>
+              <Text style={styles.requirementsTitle}>Şifre Gereksinimleri:</Text>
+              <View style={styles.requirementsList}>
+                <Text style={styles.requirementItem}>• En az 8 karakter</Text>
+                <Text style={styles.requirementItem}>• Büyük ve küçük harf</Text>
+                <Text style={styles.requirementItem}>• Rakam ve özel karakter</Text>
+              </View>
+            </View>
+
+            <CustomButton
+              title={isLoading ? "Kayıt Olunuyor..." : "Kayıt Ol"}
+              onPress={handleSubmit(onSubmit)}
+              loading={isLoading}
+              disabled={isLoading}
+              style={styles.registerButton}
+            />
+
+            {!isConnected && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineText}>📡 Çevrimdışı modda çalışıyorsunuz</Text>
+              </View>
+            )}
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>veya</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <View style={styles.socialButtons}>
+              <CustomButton
+                title="Google ile Kayıt Ol"
+                onPress={handleGoogleRegister}
+                variant="outline"
+                icon="google"
+                style={styles.socialButton}
+              />
+              
+              <CustomButton
+                title="Apple ile Kayıt Ol"
+                onPress={handleAppleRegister}
+                variant="outline"
+                icon="apple"
+                style={styles.socialButton}
+              />
+            </View>
+
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>
+                Zaten hesabınız var mı?{' '}
+                <TouchableOpacity onPress={handleLogin}>
+                  <Text style={styles.loginLink}>Giriş Yapın</Text>
+                </TouchableOpacity>
+              </Text>
+            </View>
+          </View>
         </View>
-      </Surface>
-    </ScrollView>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Kayıt olduğunuzda FireAlert'in Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmiş olursunuz.
+          </Text>
+        </View>
+      </ScrollView>
+    </ErrorBoundary>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
-  surface: {
-    margin: 16,
-    padding: 24,
-    borderRadius: 12,
+  contentContainer: {
+    flexGrow: 1,
+    paddingHorizontal: theme.spacing.lg,
   },
   header: {
+    marginTop: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
     alignItems: 'center',
-    marginBottom: 32,
   },
   title: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#FF5722',
+    color: theme.colors.primary,
     marginBottom: 8,
   },
   subtitle: {
-    opacity: 0.7,
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  formContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  formSubtitle: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xl,
   },
   form: {
-    gap: 16,
+    width: '100%',
   },
-  input: {
-    backgroundColor: 'transparent',
+  nameRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
   },
-  button: {
-    marginTop: 8,
+  nameInput: {
+    flex: 1,
   },
-  textButton: {
-    marginTop: 8,
+  termsContainer: {
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
   },
-  error: {
-    color: '#f44336',
+  passwordRequirements: {
+    backgroundColor: theme.colors.background + '80',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.lg,
+  },
+  requirementsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  requirementsList: {
+    gap: 4,
+  },
+  requirementItem: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  registerButton: {
+    marginBottom: theme.spacing.xl,
+  },
+  offlineBanner: {
+    backgroundColor: theme.colors.warning + '20',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.lg,
+    alignItems: 'center',
+  },
+  offlineText: {
+    color: theme.colors.warning,
+    fontSize: 14,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  dividerText: {
+    marginHorizontal: theme.spacing.md,
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+  },
+  socialButtons: {
+    gap: theme.spacing.md,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  loginContainer: {
+    alignItems: 'center',
+    marginTop: theme.spacing.xl,
+  },
+  loginText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+  },
+  loginLink: {
+    color: theme.colors.primary,
+    fontWeight: 'bold',
+  },
+  footer: {
+    marginBottom: theme.spacing.xl,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
     textAlign: 'center',
+    lineHeight: 16,
   },
 });

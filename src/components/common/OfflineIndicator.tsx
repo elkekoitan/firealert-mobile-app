@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Animated } from 'react-native';
-import { useNetInfo } from '@react-native-netinfo/netinfo';
-import { useAppSelector } from '../../hooks/redux';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useOfflineService } from '../../services/offline';
-import { FAB } from 'react-native-paper';
 import { IconSource } from 'react-native-paper/lib/typescript/components/Icon';
 
 interface OfflineIndicatorProps {
@@ -17,9 +15,8 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   onRetry,
   showDetails = false,
 }) => {
-  const netInfo = useNetInfo();
+  const { isConnected } = useNetworkStatus();
   const { getQueueStatus } = useOfflineService();
-  const { isConnected } = netInfo;
   const [isExpanded, setIsExpanded] = useState(false);
   const [queueStatus, setQueueStatus] = useState({
     total: 0,
@@ -117,7 +114,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} testID="offline-indicator">
       {/* Status indicator */}
       <View style={styles.statusContainer}>
         <Animated.View style={[styles.indicator, indicatorStyle]} />
@@ -271,9 +268,8 @@ export const CompactOfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   style,
   onRetry,
 }) => {
-  const netInfo = useNetInfo();
+  const { isConnected } = useNetworkStatus();
   const { getQueueStatus } = useOfflineService();
-  const { isConnected } = netInfo;
   const [queueStatus, setQueueStatus] = useState({
     total: 0,
     pending: 0,

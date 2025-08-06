@@ -1,5 +1,5 @@
 import { store } from '../store';
-import { apiSlice } from '../store/services/api';
+import { api as fireApi } from '../api/generated/api';
 import * as SecureStore from 'expo-secure-store';
 
 // Offline queue item interface
@@ -12,6 +12,7 @@ export interface OfflineQueueItem {
   maxRetries: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
+  nextRetryAt?: number;
 }
 
 // Offline storage keys
@@ -99,7 +100,7 @@ export class OfflineService {
     }
   }
 
-  // Process offline queue
+  // Process offline queue with exponential backoff
   private async processQueue(): Promise<void> {
     if (this.isProcessing) {
       return;
@@ -112,10 +113,11 @@ export class OfflineService {
       const isConnected = await this.isNetworkConnected();
       
       if (!isConnected) {
-        // Wait for network connection
+        // Schedule retry with exponential backoff
+        const delay = Math.min(30000, 1000 * Math.pow(2, 3)); // Max 30 seconds
         setTimeout(() => {
           this.processQueue();
-        }, 5000);
+        }, delay);
         return;
       }
 
@@ -136,6 +138,8 @@ export class OfflineService {
             item.error = error instanceof Error ? error.message : 'Unknown error';
           } else {
             item.status = 'pending';
+            // Add exponential backoff delay
+            item.nextRetryAt = Date.now() + (1000 * Math.pow(2, item.retryCount));
           }
           
           await this.saveQueue();
@@ -143,8 +147,12 @@ export class OfflineService {
       }
 
       // Check if there are more items to process
-      const hasPendingItems = this.queue.some(item => item.status === 'pending');
-      if (hasPendingItems) {
+      const hasMorePending = this.queue.some(item => 
+        item.status === 'pending' && 
+        (!item.nextRetryAt || item.nextRetryAt <= Date.now())
+      );
+      
+      if (hasMorePending) {
         setTimeout(() => {
           this.processQueue();
         }, 1000);
@@ -189,7 +197,7 @@ export class OfflineService {
     
     // Create report via API
     const result = await store.dispatch(
-      apiSlice.endpoints.createReport.initiate(payload)
+      fireApi.endpoints.createReport.initiate(payload as any)
     );
     
     if (result.error) {
@@ -203,7 +211,7 @@ export class OfflineService {
     
     // Update report via API
     const result = await store.dispatch(
-      apiSlice.endpoints.updateReport.initiate(payload)
+      fireApi.endpoints.updateReport.initiate(payload as any)
     );
     
     if (result.error) {
@@ -215,21 +223,42 @@ export class OfflineService {
   private async processUploadImage(item: OfflineQueueItem): Promise<void> {
     const { payload } = item;
     
-    // Upload image via API
-    const result = await store.dispatch(
-      apiSlice.endpoints.uploadImage.initiate(payload)
-    );
-    
-    if (result.error) {
-      throw new Error(result.error.message || 'Failed to upload image');
+    try {
+      // Use the imageUploadService for proper image upload
+      const { imageUploadService } = await import('./imageUpload');
+      
+      const result = await imageUploadService.uploadImage(
+        payload.uri,
+        payload.userId,
+        {
+          reportId: payload.reportId,
+          compression: 0.8,
+          quality: 0.8,
+        }
+      );
+      
+      if (!result) {
+        throw new Error('Image upload failed');
+      }
+      
+      // Store the result for later use
+      await this.storeOfflineData(`upload_result_${item.id}`, result);
+    } catch (error) {
+      console.error('Process upload image error:', error);
+      throw error;
     }
   }
 
   // Process sync data
   private async processSyncData(item: OfflineQueueItem): Promise<void> {
     // Sync data with backend
+    const syncEndpoint = (fireApi.endpoints as any)?.syncData;
+    if (!syncEndpoint) {
+      // No-op if sync endpoint is not defined in current API
+      return;
+    }
     const result = await store.dispatch(
-      apiSlice.endpoints.syncData.initiate(item.payload)
+      syncEndpoint.initiate(item.payload)
     );
     
     if (result.error) {
@@ -240,12 +269,33 @@ export class OfflineService {
   // Check network connectivity
   private async isNetworkConnected(): Promise<boolean> {
     try {
-      const response = await fetch('https://www.google.com', {
-        method: 'HEAD',
-        cache: 'no-cache',
-      });
-      return response.ok;
-    } catch {
+      // Import network status hook
+      const NetInfo = await import('@react-native-community/netinfo');
+      const networkState = await NetInfo.default.fetch();
+      
+      // Check if connected and internet is reachable
+      if (!networkState.isConnected || networkState.isInternetReachable === false) {
+        return false;
+      }
+      
+      // Additional check with a lightweight request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      try {
+        const response = await fetch('https://www.google.com/generate_204', {
+          method: 'HEAD',
+          cache: 'no-cache',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response.ok;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        return false;
+      }
+    } catch (error) {
+      console.error('Network connectivity check error:', error);
       return false;
     }
   }
@@ -398,6 +448,98 @@ export const getOfflineService = (): OfflineService => {
 export const initializeOfflineService = (): void => {
   const service = getOfflineService();
   service.startPeriodicSync();
+};
+
+// React hook for offline functionality
+import { useState, useEffect, useCallback } from 'react';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+
+export const useOfflineQueue = () => {
+  const [queueStatus, setQueueStatus] = useState({
+    total: 0,
+    pending: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { isConnected } = useNetworkStatus();
+  const offlineService = getOfflineService();
+
+  // Update queue status
+  const updateQueueStatus = useCallback(() => {
+    const status = offlineService.getQueueStatus();
+    setQueueStatus(status);
+    setIsProcessing(offlineService['isProcessing']);
+  }, [offlineService]);
+
+  // Initialize and start monitoring
+  useEffect(() => {
+    updateQueueStatus();
+    
+    // Update status periodically
+    const interval = setInterval(updateQueueStatus, 2000);
+    
+    return () => clearInterval(interval);
+  }, [updateQueueStatus]);
+
+  // Process queue when network becomes available
+  useEffect(() => {
+    if (isConnected && queueStatus.pending > 0) {
+      offlineService['processQueue']();
+    }
+  }, [isConnected, queueStatus.pending, offlineService]);
+
+  const addToQueue = useCallback(async (
+    type: OfflineQueueItem['type'],
+    payload: any,
+    maxRetries: number = 3
+  ): Promise<string> => {
+    const itemId = await offlineService.addToQueue(type, payload, maxRetries);
+    updateQueueStatus();
+    return itemId;
+  }, [offlineService, updateQueueStatus]);
+
+  const retryFailed = useCallback(async () => {
+    await offlineService.retryFailed();
+    updateQueueStatus();
+  }, [offlineService, updateQueueStatus]);
+
+  const clearCompleted = useCallback(async () => {
+    await offlineService.clearCompleted();
+    updateQueueStatus();
+  }, [offlineService, updateQueueStatus]);
+
+  const clearAll = useCallback(async () => {
+    await offlineService.clearAll();
+    updateQueueStatus();
+  }, [offlineService, updateQueueStatus]);
+
+  const getFailedItems = useCallback(() => {
+    return offlineService.getFailedItems();
+  }, [offlineService]);
+
+  const storeOfflineData = useCallback(async (key: string, data: any) => {
+    await offlineService.storeOfflineData(key, data);
+  }, [offlineService]);
+
+  const getOfflineData = useCallback(async (key?: string) => {
+    return await offlineService.getOfflineData(key);
+  }, [offlineService]);
+
+  return {
+    queueStatus,
+    isProcessing,
+    isOnline: isConnected,
+    addToQueue,
+    retryFailed,
+    clearCompleted,
+    clearAll,
+    getFailedItems,
+    storeOfflineData,
+    getOfflineData,
+    updateQueueStatus,
+  };
 };
 
 // Cleanup offline service

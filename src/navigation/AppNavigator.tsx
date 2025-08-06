@@ -1,61 +1,64 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useRef, useEffect } from 'react';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useAuth } from '../contexts/AuthContext';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/index';
+import { setNavigationRef, setupDeepLinkListener, deepLinkMapping } from '../services/navigationService';
 
-// Auth Screens
-import AuthScreen from '../pages/AuthScreen';
+// Auth Navigator
+import AuthNavigator from './AuthNavigator';
 
-// Main App Screens
-import HomeScreen from '../pages/HomeScreen';
-import ReportScreen from '../pages/ReportScreen';
-import NotificationsScreen from '../pages/NotificationsScreen';
-import ProfileScreen from '../pages/ProfileScreen';
-import SettingsScreen from '../pages/SettingsScreen';
+// Main Navigator  
+import MainNavigator from './MainNavigator';
 
 // Define RootStackParamList for type safety
 export type RootStackParamList = {
-  Auth: undefined; // No params for Auth screen
-  Home: undefined;
-  Report: undefined;
-  Notifications: undefined;
-  Profile: undefined;
-  Settings: undefined;
+  Auth: undefined;
+  Main: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>(); // Apply type to Stack navigator
-
-const AuthStack = () => {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Auth" component={AuthScreen} />
-    </Stack.Navigator>
-  );
-};
-
-const MainAppStack = () => {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Report" component={ReportScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-    </Stack.Navigator>
-  );
-};
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => {
-  const { session, loading } = useAuth();
+  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const authState = useSelector((state: any) => state.auth);
+  const { isAuthenticated = false, isLoading = false } = authState || {};
 
-  if (loading) {
+  // Setup navigation reference and deep linking
+  useEffect(() => {
+    // Set navigation reference for the navigation service
+    setNavigationRef(navigationRef);
+    
+    // Setup deep link listener
+    const unsubscribe = setupDeepLinkListener();
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  if (isLoading) {
     // You might want to render a splash screen or loading indicator here
     return null; 
   }
 
   return (
-    <NavigationContainer>
-      {session && session.user ? <MainAppStack /> : <AuthStack />}
+    <NavigationContainer 
+      ref={navigationRef}
+      linking={deepLinkMapping}
+      onReady={() => {
+        console.log('Navigation container ready');
+      }}
+    >
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          <Stack.Screen name="Main" component={MainNavigator} />
+        ) : (
+          <Stack.Screen name="Auth" component={AuthNavigator} />
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
   );
 };

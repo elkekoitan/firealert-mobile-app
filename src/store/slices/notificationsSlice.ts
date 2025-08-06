@@ -1,15 +1,26 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Notification } from '../../types';
+import { EmergencyAlertData } from '../../components/common/EmergencyAlertOverlay';
 
 interface NotificationsState {
   notifications: Notification[];
+  alerts: any[];
   unreadCount: number;
+  selectedAlert: any | null;
+  emergencyAlert: EmergencyAlertData | null;
+  isLoading: boolean;
+  error: string | null;
 }
 
 const initialState: NotificationsState = {
   notifications: [],
+  alerts: [],
   unreadCount: 0,
+  selectedAlert: null,
+  emergencyAlert: null,
+  isLoading: false,
+  error: null,
 };
 
 const notificationsSlice = createSlice({
@@ -47,6 +58,30 @@ const notificationsSlice = createSlice({
         state.notifications.splice(index, 1);
       }
     },
+    // Alert-specific actions
+    fetchAlerts: (state) => {
+      state.isLoading = true;
+      state.error = null;
+    },
+    clearAlerts: (state) => {
+      state.alerts = [];
+    },
+    markAlertAsRead: (state, action: PayloadAction<string>) => {
+      const alert = state.alerts.find(a => a.id === action.payload);
+      if (alert) {
+        alert.isRead = true;
+      }
+    },
+    setSelectedAlert: (state, action: PayloadAction<any>) => {
+      state.selectedAlert = action.payload;
+    },
+    // Emergency alert actions
+    showEmergencyAlert: (state, action: PayloadAction<EmergencyAlertData>) => {
+      state.emergencyAlert = action.payload;
+    },
+    clearEmergencyAlert: (state) => {
+      state.emergencyAlert = null;
+    },
   },
 });
 
@@ -54,6 +89,12 @@ export const {
   addNotification, 
   markAsRead, 
   markAllAsRead, 
-  removeNotification 
+  removeNotification,
+  fetchAlerts,
+  clearAlerts,
+  markAlertAsRead,
+  setSelectedAlert,
+  showEmergencyAlert,
+  clearEmergencyAlert
 } = notificationsSlice.actions;
 export default notificationsSlice.reducer;

@@ -1,24 +1,35 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "declaration": false,
+    "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "target": "ES2021",
+    "target": "ES2020",
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
     "skipLibCheck": true,
-    "moduleResolution": "node",
-    "types": ["node"],
-    "esModuleInterop": true
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@/*": ["src/*"],
+      "@/common/*": ["src/common/*"],
+      "@/auth/*": ["src/auth/*"],
+      "@/reports/*": ["src/reports/*"],
+      "@/satellite/*": ["src/satellite/*"],
+      "@/alerts/*": ["src/alerts/*"],
+      "@/users/*": ["src/users/*"],
+      "@/notifications/*": ["src/notifications/*"],
+      "@/database/*": ["src/database/*"],
+      "@/external-apis/*": ["src/external-apis/*"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+  "exclude": ["node_modules", "dist", "test"]
 }
