@@ -1,0 +1,505 @@
+openapi: 3.1.0
+info:
+  title: FireAlert Backend API
+  version: "1.0.0"
+  description: |
+    FireAlert v1 REST API (contract-first). Supabase (PostgreSQL + PostGIS + Auth + Realtime + Storage) ve Node.js (NestJS) uygulama katmanını hedefler.
+    Bu taslak, frontend için tip-jenerasyon (openapi-typescript) ve backend için swagger doğrulaması amacıyla hazırlanmıştır.
+servers:
+  - url: https://api.firealert.com/v1
+    description: Production
+  - url: https://staging-api.firealert.com/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Development
+tags:
+  - name: auth
+    description: Authentication and session endpoints
+  - name: reports
+    description: User fire reports
+  - name: satellite
+    description: Satellite hotspots (FIRMS/MODIS/VIIRS)
+  - name: alerts
+    description: Alerts and notifications
+  - name: notifications
+    description: Push token registration and tests
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Id:
+      type: string
+      format: uuid
+    Timestamp:
+      type: string
+      format: date-time
+
+    RiskLevel:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+
+    ReportStatus:
+      type: string
+      enum: [PENDING, VERIFIED, FALSE_ALARM, RESOLVED]
+
+    AlertType:
+      type: string
+      enum: [FIRE_ALERT, VERIFICATION, EMERGENCY, SYSTEM]
+
+    PlatformType:
+      type: string
+      enum: [ios, android]
+
+    User:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        email: { type: string, format: email }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        reliability_score: { type: integer, minimum: 0, maximum: 100 }
+        total_reports: { type: integer, minimum: 0 }
+        verified_reports: { type: integer, minimum: 0 }
+        is_verified: { type: boolean }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+
+    LocationPoint:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+
+    FireReport:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        user_id: { $ref: "#/components/schemas/Id" }
+        description: { type: string }
+        images:
+          type: array
+          items: { type: string }
+        location: { $ref: "#/components/schemas/LocationPoint" }
+        ai_confidence: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        ai_detected:
+          type: array
+          items: { type: string }
+        ai_risk_level: { $ref: "#/components/schemas/RiskLevel" }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        reported_at: { $ref: "#/components/schemas/Timestamp" }
+        verified_at: { $ref: "#/components/schemas/Timestamp" }
+        emergency112_notified: { type: boolean }
+        satellite_match_id: { $ref: "#/components/schemas/Id" }
+
+    SatelliteHotspot:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        source:
+          type: string
+          enum: [NASA_FIRMS, MODIS, VIIRS]
+        confidence: { type: integer, nullable: true }
+        brightness: { type: number, nullable: true }
+        acquired_at: { $ref: "#/components/schemas/Timestamp" }
+        location: { $ref: "#/components/schemas/LocationPoint" }
+        distance_to_nearest_report: { type: number, nullable: true }
+        metadata: { type: object, additionalProperties: true }
+
+    Alert:
+      type: object
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        type: { $ref: "#/components/schemas/AlertType" }
+        title: { type: string }
+        body: { type: string }
+        data: { type: object, additionalProperties: true }
+        user_id: { $ref: "#/components/schemas/Id" }
+        created_at: { $ref: "#/components/schemas/Timestamp" }
+
+    PushTokenRegisterRequest:
+      type: object
+      required: [expo_token, platform]
+      properties:
+        expo_token: { type: string }
+        platform: { $ref: "#/components/schemas/PlatformType" }
+
+    AuthRegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        name: { type: string }
+
+    AuthLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        user: { $ref: "#/components/schemas/User" }
+
+    CreateReportRequest:
+      type: object
+      required: [description, latitude, longitude]
+      properties:
+        description: { type: string, minLength: 10 }
+        images:
+          type: array
+          items: { type: string } # optional local URIs before upload
+        latitude: { type: number, format: double, minimum: -90, maximum: 90 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180 }
+
+    UpdateReportRequest:
+      type: object
+      properties:
+        description: { type: string }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+
+    PresignedUrlResponse:
+      type: object
+      required: [url, fields]
+      properties:
+        url: { type: string }
+        fields:
+          type: object
+          additionalProperties: true
+
+    NearbyQuery:
+      type: object
+      properties:
+        bbox:
+          type: array
+          description: "[west, south, east, north]"
+          items: { type: number }
+          minItems: 4
+          maxItems: 4
+        radius:
+          type: number
+          description: meters (optional if bbox provided)
+        hours:
+          type: integer
+          description: "Last N hours (e.g. 24, 48, 72)"
+        riskLevel:
+          $ref: "#/components/schemas/RiskLevel"
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthRegisterRequest" }
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "400": { description: Bad request }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthLoginRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { description: Unauthorized }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Refresh access token
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Logout user
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: No content }
+
+  /reports:
+    get:
+      tags: [reports]
+      summary: List nearby reports (bbox/hours/riskLevel)
+      parameters:
+        - in: query
+          name: bbox
+          schema:
+            type: array
+            items: { type: number }
+            minItems: 4
+            maxItems: 4
+          style: form
+          explode: false
+          description: "[west, south, east, north]"
+        - in: query
+          name: radius
+          schema: { type: number }
+          description: meters (optional if bbox provided)
+        - in: query
+          name: hours
+          schema: { type: integer }
+          description: last N hours (24/48/72)
+        - in: query
+          name: riskLevel
+          schema: { $ref: "#/components/schemas/RiskLevel" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FireReport" }
+
+    post:
+      tags: [reports]
+      summary: Create a new fire report
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReportRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FireReport" }
+        "400": { description: Bad request }
+        "401": { description: Unauthorized }
+
+  /reports/mine:
+    get:
+      tags: [reports]
+      summary: List my reports
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FireReport" }
+
+  /reports/{id}:
+    get:
+      tags: [reports]
+      summary: Get report by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FireReport" }
+        "404": { description: Not found }
+
+    patch:
+      tags: [reports]
+      summary: Update a report (owner or admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateReportRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FireReport" }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+        "404": { description: Not found }
+
+    delete:
+      tags: [reports]
+      summary: Delete a report (owner or admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+      responses:
+        "204": { description: No content }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+
+  /reports/{id}/images:
+    post:
+      tags: [reports]
+      summary: Get a pre-signed URL for image upload
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PresignedUrlResponse" }
+        "401": { description: Unauthorized }
+        "404": { description: Not found }
+
+  /satellite/nearby:
+    get:
+      tags: [satellite]
+      summary: List satellite hotspots by bbox/hours
+      parameters:
+        - in: query
+          name: bbox
+          schema:
+            type: array
+            items: { type: number }
+            minItems: 4
+            maxItems: 4
+          style: form
+          explode: false
+          description: "[west, south, east, north]"
+        - in: query
+          name: hours
+          schema: { type: integer }
+          description: last N hours
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SatelliteHotspot" }
+
+  /satellite/ingest:
+    post:
+      tags: [satellite]
+      summary: Trigger ingest job (protected/cron)
+      security:
+        - bearerAuth: []
+      responses:
+        "202": { description: Accepted }
+        "403": { description: Forbidden }
+
+  /alerts:
+    get:
+      tags: [alerts]
+      summary: List alerts (broadcast + user-specific)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Alert" }
+
+  /alerts/{id}/read:
+    patch:
+      tags: [alerts]
+      summary: Mark an alert as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { $ref: "#/components/schemas/Id" }
+      responses:
+        "204": { description: No content }
+
+  /alerts/broadcast:
+    post:
+      tags: [alerts]
+      summary: Broadcast an alert (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, title, body]
+              properties:
+                type: { $ref: "#/components/schemas/AlertType" }
+                title: { type: string }
+                body: { type: string }
+                data: { type: object, additionalProperties: true }
+      responses:
+        "201": { description: Created }
+        "403": { description: Forbidden }
+
+  /notifications/push-token:
+    post:
+      tags: [notifications]
+      summary: Register Expo push token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PushTokenRegisterRequest" }
+      responses:
+        "201": { description: Created }
+        "400": { description: Bad request }
