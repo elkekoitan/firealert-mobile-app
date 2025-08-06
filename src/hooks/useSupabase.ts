@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../integrations/supabase/client'
-import { FireReport, Notification, SatelliteData } from '../types'
+import { FireReport, Notification, SatelliteData, User } from '../types' // User tipini import ettik
 
 export const useFireReports = () => {
   const [reports, setReports] = useState<FireReport[]>([])
@@ -204,4 +204,97 @@ export const useNotifications = (userId: string) => {
     addNotification,
     refetch: fetchNotifications,
   }
+}
+
+// Yeni useUserProfile kancası
+export const useUserProfile = (userId: string) => {
+  const [profile, setProfile] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchProfile = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (error) throw error
+
+      setProfile({
+        id: data.id,
+        email: '', // E-posta bilgisi auth.users tablosundan gelir, burada boş bırakıldı
+        firstName: data.first_name || undefined,
+        lastName: data.last_name || undefined,
+        name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+        avatarUrl: data.avatar_url || undefined,
+        reliabilityScore: data.reliability_score || 50,
+        totalReports: data.total_reports || 0,
+        verifiedReports: data.verified_reports || 0,
+        createdAt: data.created_at,
+        isVerified: (data.reliability_score || 50) >= 70,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while fetching profile')
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  const updateProfile = useCallback(async (updates: {
+    firstName?: string
+    lastName?: string
+    avatarUrl?: string
+  }) => {
+    if (!userId) {
+      throw new Error('User ID is required to update profile');
+    }
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: updates.firstName,
+          last_name: updates.lastName,
+          avatar_url: updates.avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setProfile(prev => {
+        if (!prev) return null;
+        const updatedUser: User = {
+          ...prev,
+          firstName: data.first_name || undefined,
+          lastName: data.last_name || undefined,
+          name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+          avatarUrl: data.avatar_url || undefined,
+          updatedAt: data.updated_at, // updated_at eklendi
+        };
+        return updatedUser;
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update profile')
+      throw err;
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    fetchProfile()
+  }, [fetchProfile])
+
+  return { profile, loading, error, updateProfile, refetchProfile: fetchProfile }
 }

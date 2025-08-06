@@ -1,4 +1,3 @@
-
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User } from '../../types';
 import * as SecureStore from 'expo-secure-store';
@@ -31,7 +30,9 @@ export const loginUser = createAsyncThunk(
     const mockUser: User = {
       id: '1',
       email,
-      name: 'Test User',
+      firstName: 'Test', // Güncellendi
+      lastName: 'Kullanıcı', // Güncellendi
+      name: 'Test Kullanıcı', // Türetilmiş veya isteğe bağlı
       reliabilityScore: 75,
       totalReports: 12,
       verifiedReports: 9,
@@ -51,11 +52,11 @@ export const loginUser = createAsyncThunk(
 
 export const registerUser = createAsyncThunk(
   'auth/register',
-  async ({ email, password, name, phone }: { 
+  async ({ email, password, firstName, lastName }: { // firstName ve lastName eklendi
     email: string; 
     password: string; 
-    name: string; 
-    phone?: string; 
+    firstName: string; 
+    lastName: string; 
   }) => {
     // Simulated API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -63,8 +64,9 @@ export const registerUser = createAsyncThunk(
     const mockUser: User = {
       id: Date.now().toString(),
       email,
-      name,
-      phone,
+      firstName, // Güncellendi
+      lastName,  // Güncellendi
+      name: `${firstName} ${lastName}`, // Türetilmiş
       reliabilityScore: 50, // Starting score
       totalReports: 0,
       verifiedReports: 0,
@@ -116,6 +118,10 @@ const authSlice = createSlice({
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
+        // Eğer firstName veya lastName güncellenirse name'i de güncelleyelim
+        if (action.payload.firstName !== undefined || action.payload.lastName !== undefined) {
+          state.user.name = `${state.user.firstName || ''} ${state.user.lastName || ''}`.trim();
+        }
       }
     },
   },

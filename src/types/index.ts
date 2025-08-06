@@ -1,14 +1,15 @@
-
 export interface User {
   id: string;
   email: string;
-  name: string;
-  phone?: string;
-  avatar?: string;
+  firstName?: string; // Supabase profiles tablosundaki first_name ile eşleşir
+  lastName?: string;  // Supabase profiles tablosundaki last_name ile eşleşir
+  name?: string; // firstName ve lastName'den türetilebilir, isteğe bağlı
+  avatarUrl?: string; // Supabase profiles tablosundaki avatar_url ile eşleşir
   reliabilityScore: number;
   totalReports: number;
   verifiedReports: number;
   createdAt: string;
+  updatedAt?: string; // Yeni eklendi
   isVerified: boolean;
 }
 

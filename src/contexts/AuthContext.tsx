@@ -77,12 +77,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser({
         id: userId,
         email: session?.user?.email || '',
-        name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+        firstName: data.first_name || undefined, // Eşleme yapıldı
+        lastName: data.last_name || undefined,   // Eşleme yapıldı
+        name: `${data.first_name || ''} ${data.last_name || ''}`.trim(), // name türetildi
+        avatarUrl: data.avatar_url || undefined, // Eşleme yapıldı
         reliabilityScore: data.reliability_score || 50,
         totalReports: data.total_reports || 0,
         verifiedReports: data.verified_reports || 0,
         createdAt: data.created_at,
-        isVerified: data.reliability_score >= 70,
+        isVerified: (data.reliability_score || 50) >= 70, // reliability_score'a göre türetildi
       })
     } catch (error) {
       console.error('Error fetching user profile:', error)

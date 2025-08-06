@@ -42,7 +42,7 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>Hoş Geldiniz, {user?.name || user?.email}!</Text>
+        <Text style={styles.welcomeText}>Hoş Geldiniz, {user?.firstName || user?.email}!</Text>
         <Button title="Çıkış Yap" onPress={handleSignOut} color={COLORS.error} />
       </View>
 
