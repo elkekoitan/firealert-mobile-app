@@ -13,7 +13,17 @@ import NotificationsScreen from '../pages/NotificationsScreen';
 import ProfileScreen from '../pages/ProfileScreen';
 import SettingsScreen from '../pages/SettingsScreen';
 
-const Stack = createNativeStackNavigator();
+// Define RootStackParamList for type safety
+export type RootStackParamList = {
+  Auth: undefined; // No params for Auth screen
+  Home: undefined;
+  Report: undefined;
+  Notifications: undefined;
+  Profile: undefined;
+  Settings: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>(); // Apply type to Stack navigator
 
 const AuthStack = () => {
   return (

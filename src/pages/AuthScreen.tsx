@@ -3,7 +3,7 @@ import { View, StyleSheet, Text } from 'react-native';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '../integrations/supabase/client';
-import { COLORS } from '../constants';
+import { COLORS, SIZES } from '../constants';
 
 const AuthScreen = () => {
   return (
@@ -34,9 +34,7 @@ const AuthScreen = () => {
                 password_input_placeholder: 'Şifrenizi girin',
                 button_label: 'Giriş Yap',
                 social_provider_text: 'Şununla Giriş Yap',
-                link_text: 'Zaten hesabınız var mı? Giriş Yap',
-                forgotten_password_text: 'Şifrenizi mi unuttunuz?',
-                no_account_text: 'Hesabınız yok mu? Kayıt Ol',
+                link_text: 'Şifrenizi mi unuttunuz?', // "Şifrenizi mi unuttunuz?" linki olarak değiştirildi
               },
               sign_up: {
                 email_label: 'E-posta',
@@ -45,12 +43,12 @@ const AuthScreen = () => {
                 password_input_placeholder: 'Şifrenizi girin',
                 button_label: 'Kayıt Ol',
                 social_provider_text: 'Şununla Kayıt Ol',
-                link_text: 'Hesabınız var mı? Giriş Yap',
+                link_text: 'Hesabınız var mı? Giriş Yap', // Kayıt ekranından giriş ekranına dönme linki
               },
               forgotten_password: {
                 email_label: 'E-posta',
-                password_reset_button_label: 'Şifremi Sıfırla',
-                link_text: 'Şifrenizi mi unuttunuz?',
+                button_label: 'Şifremi Sıfırla',
+                link_text: 'Giriş Yap\'a geri dön', // Şifre sıfırlama ekranından giriş ekranına dönme linki
                 email_input_placeholder: 'E-posta adresinizi girin',
               },
               update_password: {

@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, Button } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { COLORS, SIZES } from '../constants';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // NativeStackNavigationProp eklendi
+import { RootStackParamList } from '../navigation/AppNavigator'; // RootStackParamList eklendi
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(); // useNavigation'a tür eklendi
 
   const handleSignOut = async () => {
     try {
